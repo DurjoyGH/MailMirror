@@ -6,6 +6,8 @@ import AdminLayout from "./components/Layouts/AdminLayout";
 import ProtectedRoute from "./components/ProtectedRoutes/ProtectedRoute";
 import GuestRoute from "./components/ProtectedRoutes/GuestRoute";
 import ScrollToTop from "./components/ScrollTop/ScrollTop";
+import HomePage from "./pages/Public/HomePage";
+import Login from "./pages/Auth/Login";
 
 function App() {
   return (
@@ -19,6 +21,7 @@ function App() {
         <Routes>
           {/* Public routes — anyone can access */}
           <Route element={<PublicLayout />}>
+            <Route path="/" element={<HomePage />} />
 
             {/* Guest only — redirect away if already logged in */}
             <Route element={<GuestRoute />}>

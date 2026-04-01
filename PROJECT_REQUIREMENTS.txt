@@ -1,0 +1,318 @@
+================================================================================
+                          MAILMIRROR PROJECT
+                  Complete Requirements & Architecture Guide
+================================================================================
+
+PROJECT DESCRIPTION
+================================================================================
+
+MailMirror is a web application that allows users to securely share their Gmail 
+inbox in a read-only mode via a public link.
+
+Unlike Gmail's native sharing (which allows full access), this system ensures:
+  • View-only access
+  • No reply / edit / delete permissions
+  • Controlled sharing via unique links
+  • Safe, controlled, dynamic, and shareable experience
+
+PROBLEM IT SOLVES
+================================================================================
+
+Gmail does not provide a way to share inbox as view-only.
+
+Current options:
+  ❌ Gmail delegation → full access (not safe)
+  ❌ Screenshots / forwarding → not dynamic (manual)
+
+MailMirror solution:
+  ✔ Safe - Read-only Gmail scope, no write access
+  ✔ Controlled - Unique links, ability to disable sharing
+  ✔ Dynamic - Real-time email updates
+  ✔ Shareable - One-click public link generation
+
+================================================================================
+HOW IT WORKS (USER FLOW)
+================================================================================
+
+1. USER LOGIN
+   • User logs in using Google OAuth
+   • Grants permission: gmail.readonly scope
+
+2. TOKEN STORAGE
+   • Backend stores securely:
+     - Google ID
+     - Email address
+     - Refresh token (for auto-renewal)
+   • Storage: PostgreSQL (Neon) + Prisma ORM
+
+3. EMAIL FETCHING
+   • Backend uses Gmail API with:
+     - access_token (auto-refreshed via refresh_token)
+     - read-only scope (no write access)
+
+4. LINK GENERATION
+   • User creates shareable link:
+     - Example: https://yourapp.com/view/abc123
+     - Unique token per user
+
+5. PUBLIC VIEWING
+   • Anyone with the link can:
+     ✓ View email list
+     ✓ Read email content
+     ✗ Cannot reply
+     ✗ Cannot delete
+     ✗ Cannot modify
+
+================================================================================
+TECH STACK
+================================================================================
+
+BACKEND
+  • Node.js runtime
+  • Express.js framework
+  • Prisma ORM (database management)
+  • PostgreSQL (Neon - cloud database)
+
+AUTHENTICATION & API
+  • Google OAuth 2.0 (user authentication)
+  • Gmail API (email fetching)
+
+FRONTEND
+  • React.js (UI framework)
+  • React Router DOM (navigation)
+  • Tailwind CSS (styling)
+  • Lucide React (icons)
+  • React Hot Toast (notifications)
+  • Axios (HTTP client)
+  • Montserrat font (primary)
+  • Exo 2 font (headings)
+
+================================================================================
+SECURITY FEATURES
+================================================================================
+
+✅ Read-only Gmail scope - Users grant only read permission
+✅ Tokens stored securely - Encrypted in PostgreSQL
+✅ No write access to Gmail - Backend validates all operations
+✅ Optional features:
+   • Password-protected links
+   • Expiry links (time-based access)
+
+================================================================================
+CORE FEATURES
+================================================================================
+
+USER FEATURES
+  • Login with Google (OAuth 2.0)
+  • Connect Gmail (grant read-only access)
+  • Generate shareable link (unique per user)
+  • Manage sharing (enable/disable)
+
+SHARING FEATURES
+  • Public read-only inbox (via unique link)
+  • Unique link per user
+  • Enable/disable sharing on demand
+
+OPTIONAL ADVANCED FEATURES
+  • Email filtering (by sender, subject, date)
+  • Search emails (full-text search)
+  • View analytics (track view count)
+  • Email caching (performance optimization)
+
+================================================================================
+SYSTEM ARCHITECTURE
+================================================================================
+
+COMPONENT FLOW:
+
+Frontend (React)
+      ↓
+Backend (Node.js + Express)
+      ↓
+Google OAuth (Authentication)
+      ↓
+Gmail API (Email fetching)
+      ↓
+Database (PostgreSQL + Prisma)
+      ↓
+Public Sharing Link
+
+DATABASE SCHEMA (Prisma)
+  • Users table: id, email, googleId, refreshToken, createdAt
+  • ShareLinks table: id, userId, token, isActive, createdAt, expiresAt
+  • Messages table: id, senderEmail, subject, body, timestamp (from Gmail)
+
+API ENDPOINTS (Backend)
+  POST /api/auth/google - OAuth callback
+  GET /api/emails - Fetch user's emails (protected)
+  POST /api/share - Generate share link (protected)
+  DELETE /api/share/:id - Disable share link (protected)
+  GET /api/view/:token - View shared inbox (public)
+
+================================================================================
+FRONTEND ARCHITECTURE
+================================================================================
+
+PROJECT STRUCTURE:
+
+/frontend
+  /src
+    /components
+      /Layouts
+        - AdminLayout.jsx (sidebar + navbar)
+        - PublicLayout.jsx (navbar + footer)
+      /Navigations
+        - Navbar.jsx (responsive, login/dashboard toggle)
+        - Footer.jsx (company info, links, social)
+        - AdminSidebar.jsx (admin menu)
+      /Loader
+        - Loader.jsx (custom page loader)
+      /ProtectedRoutes
+        - ProtectedRoute.jsx (authenticated only)
+        - GuestRoute.jsx (non-authenticated only)
+      /ScrollTop
+        - ScrollTop.jsx (smooth scroll to top)
+      /Toast
+        - CustomToast.jsx (notifications with theme colors)
+    /context
+      - AuthContext.jsx (user auth state management)
+    /pages
+      /Admin
+        (dashboard, manage users, add admin, send email, messages)
+      /Auth
+        - Login.jsx (Google OAuth login)
+      /Public
+        - HomePage.jsx (landing page)
+        - ContactPage.jsx (contact form)
+        - YourMailsPage.jsx (shared inbox view)
+    /services
+      - api.js (shared axios instance)
+      - authApi.js (auth endpoints)
+      - adminApi.js (admin endpoints)
+      - publicApi.js (public endpoints)
+    - App.jsx (main router)
+    - main.jsx (entry point)
+    - index.css (tailwind + global styles)
+
+DESIGN SYSTEM:
+
+Color Scheme:
+  • Background: #bee9e8 (light turquoise)
+  • Navbar/Footer: #62b6cb (medium teal)
+  • Button (Primary): #1b4965 (dark blue)
+  • Button Text: #5fa8d3 (light blue)
+  • Text Color: #1b4965 (dark blue)
+
+Typography:
+  • Primary Font: Montserrat (all UI text)
+  • Heading Font: Exo 2 (titles, branding)
+
+Icons:
+  • All icons from lucide-react library
+
+Components & Features:
+  ✓ Fully responsive (mobile-first)
+  ✓ Navbar with login/dashboard toggle
+  ✓ Footer with links and social media
+  ✓ Admin sidebar with collapsible menu
+  ✓ Custom loader for page transitions
+  ✓ Protected routes (authenticated + admin-only)
+  ✓ Custom toast notifications with theme colors
+  ✓ Smooth scroll-to-top functionality
+
+ADMIN FEATURES:
+  1. Manage Users - View, edit, delete users
+  2. Add Admin - Promote users to admin role
+  3. Send Email - Send notifications to users
+  4. Messages - Read contact form messages
+
+================================================================================
+INSTALLED PACKAGES (FRONTEND)
+================================================================================
+
+• @tailwindcss/vite - Tailwind CSS integration
+• axios - HTTP client for API calls
+• lucide-react - Icon library
+• react-hot-toast - Toast notifications
+• react-router-dom - Routing and navigation
+• tailwindcss - Utility-first CSS framework
+
+================================================================================
+NAVBAR SPECIFICATIONS
+================================================================================
+
+LEFT SIDE:
+  • MailMirror (title with Exo 2 font)
+
+NAVIGATION OPTIONS:
+  1. Home
+  2. Your Mails
+  3. Contact
+
+RIGHT SIDE:
+  • Login Button (visible when not authenticated)
+  • Dashboard Button (visible when authenticated)
+  • Logout Button (visible when authenticated)
+
+RESPONSIVE:
+  • Desktop: Full horizontal menu
+  • Mobile: Hamburger menu with toggle
+
+FEATURES:
+  • Smooth transitions
+  • Hover effects
+  • Mobile-responsive design
+  • Active route highlighting
+
+================================================================================
+FOOTER SPECIFICATIONS
+================================================================================
+
+SECTIONS:
+  1. Company Info
+     • MailMirror branding
+     • Project description
+  2. Navigation Links
+     • Home
+     • Your Mails
+     • Contact
+  3. Social Media Icons
+     • Share2 (social sharing)
+     • Code2 (GitHub/development)
+     • Globe (website)
+     • Mail (email)
+
+BOTTOM BAR:
+  • Copyright year (auto-updated)
+  • Links to Privacy Policy and Terms of Service
+
+FEATURES:
+  • Responsive grid layout
+  • Hover effects on icons
+  • Mobile-friendly stacking
+
+================================================================================
+CODE QUALITY STANDARDS
+================================================================================
+
+✓ Clean, professional code
+✓ No unnecessary comments (self-explanatory)
+✓ Consistent design across all pages
+✓ No documentation files after code generation
+✓ One page/component at a time to ensure quality
+✓ Apply color scheme consistently
+✓ Use Montserrat font throughout
+✓ Use lucide-react for all icons
+
+================================================================================
+DEVELOPMENT NOTES
+================================================================================
+
+• All public pages automatically wrap with navbar + footer via PublicLayout
+• Use PublicLayout for public routes, AdminLayout for admin routes
+• Import custom toast functions: showSuccess(), showError(), showInfo(), showWarning()
+• Admin sidebar shows: Manage Users, Add Admin, Send Email, Messages
+• Protected routes check authentication via AuthContext
+• GuestRoute redirects authenticated users away from login
+
+================================================================================
