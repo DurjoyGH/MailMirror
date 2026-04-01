@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+}
+
+model User {
+  id              String   @id @default(uuid())
+  email           String   @unique
+  name            String?
+  picture         String?
+  googleId        String   @unique
+
+  // OAuth Tokens
+  accessToken     String?
+  refreshToken    String
+  tokenExpiry     DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  links           Link[]
+  sessions        Session[]
+  emailCaches     EmailCache[]
+
+  @@index([email])
+}
+
+model Link {
+  id              String   @id @default(uuid())
+  publicId        String   @unique
+  title           String?
+  isActive        Boolean  @default(true)
+
+  // Optional security
+  password        String?   // hashed password (optional)
+  expiresAt       DateTime? // link expiration
+
+  createdAt       DateTime  @default(now())
+
+  // Relation
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Analytics
+  views           Int       @default(0)
+
+  @@index([publicId])
+  @@index([userId])
+}
+
+model Session {
+  id          String   @id @default(uuid())
+  userId      String
+  token       String   @unique
+  expiresAt   DateTime
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+model EmailCache {
+  id          String   @id @default(uuid())
+  userId      String
+
+  messageId   String   // Gmail message ID
+  subject     String?
+  from        String?
+  snippet     String?
+  receivedAt  DateTime?
+
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, messageId])
+  @@index([userId])
+}
