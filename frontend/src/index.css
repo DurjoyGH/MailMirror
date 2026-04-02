@@ -293,24 +293,22 @@ select:focus {
 /* ══════════════════════════════════════════════
    TABLE
 ══════════════════════════════════════════════ */
-table {
 .email-html-content {
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .email-html-content * {
-  max-width: 100% !important;
+  max-width: 100%;
   box-sizing: border-box;
 }
 
 .email-html-content table {
-  width: 100% !important;
   max-width: 100% !important;
-  table-layout: fixed !important;
+  table-layout: auto !important;
 }
 
 .email-html-content td,
@@ -319,7 +317,7 @@ table {
 .email-html-content span,
 .email-html-content a,
 .email-html-content div {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   word-break: break-word;
 }
 
@@ -334,6 +332,8 @@ table {
   white-space: pre-wrap !important;
   word-break: break-word;
 }
+
+table {
   width: 100%;
   border-collapse: collapse;
   font-family: 'Montserrat', sans-serif;

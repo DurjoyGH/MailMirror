@@ -80,6 +80,32 @@ const DEMO_EMAILS = [
 // ── Generate a random token ───────────────────────────────────────────────────
 const generateToken = () => Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
 
+// ── Inject mobile-responsive CSS into HTML email content ─────────────────────
+// HTML emails often have fixed-width tables (e.g. width="600"). This style
+// reset forces them to fit the container without breaking the email structure.
+const RESPONSIVE_EMAIL_STYLE = `
+<style>
+  html, body { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+  img { max-width: 100% !important; height: auto !important; }
+  a, p, span, div, td, th { word-break: break-word !important; overflow-wrap: anywhere !important; }
+
+  /* Mobile-only assistance: keep layout responsive without destroying template structure */
+  @media only screen and (max-width: 640px) {
+    table { max-width: 100% !important; }
+    td, th { max-width: 100% !important; }
+    [width] { max-width: 100% !important; }
+  }
+</style>
+`.trim();
+
+const sanitizeEmailHtml = (html) =>
+  DOMPurify.sanitize(RESPONSIVE_EMAIL_STYLE + html, {
+    ADD_TAGS: ["style"],
+    ADD_ATTR: ["style","class","id","width","height","align","bgcolor",
+               "cellpadding","cellspacing","border","target","rel"],
+    FORBID_TAGS: ["script","iframe","object","embed","form","input","button"],
+  });
+
 // ── Format email body ─────────────────────────────────────────────────────────
 const formatBody = (body) =>
   body.split("\n").map((line, i) => <span key={i}>{line}<br /></span>);
@@ -120,18 +146,19 @@ function SharePanel({ onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:px-4">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-[#1b4965]/30 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      {/* Modal */}
-      <div className="relative glass-card w-full max-w-lg shadow-2xl shadow-[#1b4965]/25 animate-fade-up overflow-hidden">
+      {/* Modal — slides up from bottom on mobile, centered on sm+ */}
+      <div className="relative glass-card w-full sm:max-w-lg shadow-2xl shadow-[#1b4965]/25 animate-fade-up overflow-hidden
+        rounded-t-3xl sm:rounded-2xl max-h-[92svh] sm:max-h-[90vh] flex flex-col">
 
         {/* Header */}
-        <div className="bg-[#62b6cb] px-6 py-5 flex items-center justify-between">
+        <div className="bg-[#62b6cb] px-5 py-4 sm:px-6 sm:py-5 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-[#1b4965] rounded-xl flex items-center justify-center shadow-md">
               <Share2 size={17} strokeWidth={2.5} className="text-[#5fa8d3]" />
@@ -152,105 +179,106 @@ function SharePanel({ onClose }) {
           </button>
         </div>
 
-        {/* Info banner */}
-        <div className="mx-5 mt-5 flex items-start gap-3 px-4 py-3 rounded-xl bg-[#bee9e8]/80 border border-[#62b6cb]/40">
-          <ShieldCheck size={15} strokeWidth={2} className="text-[#1b4965] flex-shrink-0 mt-0.5" />
-          <p className="text-xs font-medium text-[#1b4965]/75 leading-relaxed">
-            Anyone with your link can <strong>view</strong> your inbox in read-only mode.
-            They <strong>cannot</strong> reply, delete, or modify any emails.
-          </p>
-        </div>
+        {/* Scrollable body */}
+        <div className="overflow-y-auto flex-1 min-h-0">
+          {/* Info banner */}
+          <div className="mx-4 sm:mx-5 mt-4 sm:mt-5 flex items-start gap-3 px-4 py-3 rounded-xl bg-[#bee9e8]/80 border border-[#62b6cb]/40">
+            <ShieldCheck size={15} strokeWidth={2} className="text-[#1b4965] flex-shrink-0 mt-0.5" />
+            <p className="text-xs font-medium text-[#1b4965]/75 leading-relaxed">
+              Anyone with your link can <strong>view</strong> your inbox in read-only mode.
+              They <strong>cannot</strong> reply, delete, or modify any emails.
+            </p>
+          </div>
 
-        {/* Links list */}
-        <div className="px-5 py-4 flex flex-col gap-3 max-h-64 overflow-y-auto">
-          {links.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-[#1b4965]/40 gap-2">
-              <Link2 size={28} strokeWidth={1.5} />
-              <p className="text-sm font-semibold">No share links yet</p>
-            </div>
-          ) : (
-            links.map((link) => (
-              <div
-                key={link.id}
-                className={`rounded-2xl border p-4 transition-all duration-200
-                  ${link.active
-                    ? "bg-white/50 border-[#62b6cb]/40"
-                    : "bg-white/20 border-[#1b4965]/10 opacity-60"
-                  }`}
-              >
-                {/* Link URL row */}
-                <div className="flex items-center gap-2 mb-3">
-                  <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0
-                    ${link.active ? "bg-[#1b4965]" : "bg-[#1b4965]/30"}`}>
-                    {link.active
-                      ? <Globe size={12} strokeWidth={2.5} className="text-[#5fa8d3]" />
-                      : <Lock size={12} strokeWidth={2.5} className="text-white/60" />
-                    }
-                  </div>
-                  <code className="flex-1 text-[11px] font-bold text-[#1b4965]/70 truncate bg-[#1b4965]/5 rounded-lg px-2.5 py-1.5">
-                    {window.location.origin}/view/{link.token}
-                  </code>
-                  <button
-                    onClick={() => handleCopy(link.token)}
-                    disabled={!link.active}
-                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-all duration-150 cursor-pointer flex-shrink-0
-                      ${copied === link.token
-                        ? "bg-green-100 border-green-300 text-green-600"
-                        : link.active
-                          ? "bg-[#1b4965] border-[#1b4965] text-[#5fa8d3] hover:bg-[#163d54]"
-                          : "bg-transparent border-[#1b4965]/15 text-[#1b4965]/30 cursor-not-allowed"
-                      }`}
-                  >
-                    {copied === link.token
-                      ? <><Check size={11} strokeWidth={3} /> Copied!</>
-                      : <><Copy size={11} strokeWidth={2.5} /> Copy</>
-                    }
-                  </button>
-                </div>
-
-                {/* Meta row */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 text-[10px] text-[#1b4965]/50 font-medium">
-                    <span>Created {link.createdAt}</span>
-                    <span>·</span>
-                    <span className="flex items-center gap-1">
-                      <Eye size={10} strokeWidth={2} /> {link.views} views
-                    </span>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-1.5">
-                    {/* Toggle */}
+          {/* Links list */}
+          <div className="px-4 sm:px-5 py-4 flex flex-col gap-3">
+            {links.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-[#1b4965]/40 gap-2">
+                <Link2 size={28} strokeWidth={1.5} />
+                <p className="text-sm font-semibold">No share links yet</p>
+              </div>
+            ) : (
+              links.map((link) => (
+                <div
+                  key={link.id}
+                  className={`rounded-2xl border p-3 sm:p-4 transition-all duration-200
+                    ${link.active
+                      ? "bg-white/50 border-[#62b6cb]/40"
+                      : "bg-white/20 border-[#1b4965]/10 opacity-60"
+                    }`}
+                >
+                  {/* Link URL row */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0
+                      ${link.active ? "bg-[#1b4965]" : "bg-[#1b4965]/30"}`}>
+                      {link.active
+                        ? <Globe size={12} strokeWidth={2.5} className="text-[#5fa8d3]" />
+                        : <Lock size={12} strokeWidth={2.5} className="text-white/60" />
+                      }
+                    </div>
+                    {/* Truncated URL — prevent overflow on small screens */}
+                    <code className="flex-1 text-[10px] sm:text-[11px] font-bold text-[#1b4965]/70 truncate bg-[#1b4965]/5 rounded-lg px-2 py-1.5 min-w-0">
+                      /view/{link.token}
+                    </code>
                     <button
-                      onClick={() => handleToggle(link.id)}
-                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all duration-150 cursor-pointer
-                        ${link.active
-                          ? "bg-green-50 border-green-200 text-green-600 hover:bg-green-100"
-                          : "bg-[#1b4965]/5 border-[#1b4965]/15 text-[#1b4965]/50 hover:bg-[#1b4965]/10"
+                      onClick={() => handleCopy(link.token)}
+                      disabled={!link.active}
+                      className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-bold border transition-all duration-150 cursor-pointer flex-shrink-0
+                        ${copied === link.token
+                          ? "bg-green-100 border-green-300 text-green-600"
+                          : link.active
+                            ? "bg-[#1b4965] border-[#1b4965] text-[#5fa8d3] hover:bg-[#163d54]"
+                            : "bg-transparent border-[#1b4965]/15 text-[#1b4965]/30 cursor-not-allowed"
                         }`}
                     >
-                      {link.active
-                        ? <><ToggleRight size={12} strokeWidth={2} /> Active</>
-                        : <><ToggleLeft size={12} strokeWidth={2} /> Disabled</>
+                      {copied === link.token
+                        ? <><Check size={11} strokeWidth={3} /> Copied!</>
+                        : <><Copy size={11} strokeWidth={2.5} /> Copy</>
                       }
                     </button>
+                  </div>
 
-                    {/* Delete */}
-                    <button
-                      onClick={() => handleDelete(link.id)}
-                      className="w-7 h-7 rounded-lg bg-red-50 border border-red-100 hover:bg-red-100 flex items-center justify-center text-red-400 hover:text-red-600 transition-all cursor-pointer border-solid"
-                    >
-                      <Trash2 size={11} strokeWidth={2.5} />
-                    </button>
+                  {/* Meta row */}
+                  <div className="flex items-center justify-between flex-wrap gap-y-2">
+                    <div className="flex items-center gap-2 text-[10px] text-[#1b4965]/50 font-medium">
+                      <span>{link.createdAt}</span>
+                      <span>·</span>
+                      <span className="flex items-center gap-1">
+                        <Eye size={10} strokeWidth={2} /> {link.views} views
+                      </span>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => handleToggle(link.id)}
+                        className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold border transition-all duration-150 cursor-pointer
+                          ${link.active
+                            ? "bg-green-50 border-green-200 text-green-600 hover:bg-green-100"
+                            : "bg-[#1b4965]/5 border-[#1b4965]/15 text-[#1b4965]/50 hover:bg-[#1b4965]/10"
+                          }`}
+                      >
+                        {link.active
+                          ? <><ToggleRight size={12} strokeWidth={2} /> Active</>
+                          : <><ToggleLeft size={12} strokeWidth={2} /> Disabled</>
+                        }
+                      </button>
+                      <button
+                        onClick={() => handleDelete(link.id)}
+                        className="w-7 h-7 rounded-lg bg-red-50 border border-red-100 hover:bg-red-100 flex items-center justify-center text-red-400 hover:text-red-600 transition-all cursor-pointer border-solid"
+                      >
+                        <Trash2 size={11} strokeWidth={2.5} />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
-          )}
+              ))
+            )}
+          </div>
         </div>
 
-        {/* Create new link button */}
-        <div className="px-5 pb-5">
+        {/* Sticky create button */}
+        <div className="px-4 sm:px-5 pb-5 pt-3 flex-shrink-0 border-t border-[#1b4965]/8 bg-white/30">
           <button
             onClick={handleCreate}
             className="btn btn-primary w-full justify-center py-3 text-sm"
@@ -276,7 +304,7 @@ export default function YourMailsPage() {
   const [filterUnread, setFilterUnread] = useState(false);
   const [showShare, setShowShare] = useState(false);
 
-  const isOwner = !!user; // true = logged-in owner, false = public viewer
+  const isOwner = !!user;
 
   const getReadStorageKey = () => {
     const identity = user?.id || user?.email || "guest";
@@ -299,15 +327,12 @@ export default function YourMailsPage() {
 
   const markAsRead = (messageId) => {
     if (!isOwner) return;
-
     const ids = getReadIds();
     ids.add(messageId);
     saveReadIds(ids);
-
     setEmails((prev) =>
       prev.map((mail) => (mail.id === messageId ? { ...mail, unread: false } : mail))
     );
-
     setSelected((prev) =>
       prev && prev.id === messageId ? { ...prev, unread: false } : prev
     );
@@ -318,22 +343,16 @@ export default function YourMailsPage() {
       setLoading(false);
       return;
     }
-
     try {
-      console.log("📧 [YourMailsPage] Fetching mails...");
       if (refresh) {
         setIsRefreshing(true);
       } else {
         setLoading(true);
       }
       setError(null);
-
       const response = await getMailMessages();
-      console.log("✅ [YourMailsPage] Mails fetched:", response.data.count);
-
       if (response.data?.emails) {
         const readIds = getReadIds();
-
         const formattedEmails = response.data.emails.map((email) => ({
           id: email.id,
           from: email.from.split("<")[0].trim() || "Unknown",
@@ -342,22 +361,16 @@ export default function YourMailsPage() {
           preview: email.preview || "",
           body: email.body || email.preview || "",
           bodyHtml: email.bodyHtml || "",
-          time: new Date(email.date).toLocaleTimeString("en-US", {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
+          time: new Date(email.date).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
           date: new Date(email.date).toLocaleDateString(),
-          // Unread/read is managed by MailMirror app state, not Gmail label.
           unread: !readIds.has(email.id),
           starred: email.starred,
           hasAttachment: email.hasAttachment,
           avatar: email.from.charAt(0).toUpperCase(),
         }));
-
         setEmails(formattedEmails);
       }
     } catch (err) {
-      console.error("❌ [YourMailsPage] Error fetching mails:", err.message);
       setError("Failed to load mails. Using demo data.");
       setEmails(DEMO_EMAILS);
     } finally {
@@ -366,7 +379,6 @@ export default function YourMailsPage() {
     }
   };
 
-  // Fetch mails on component mount
   useEffect(() => {
     fetchMails();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -384,15 +396,13 @@ export default function YourMailsPage() {
 
   const unreadCount = emails.filter((e) => e.unread).length;
 
-  if (loading && isOwner) {
-    return <Loader />;
-  }
+  if (loading && isOwner) return <Loader />;
 
   return (
     <>
       {/* Error message */}
       {error && (
-        <div className="mx-4 mt-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm font-medium">
+        <div className="mx-0 sm:mx-4 mt-3 sm:mt-4 p-3 rounded-none sm:rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs sm:text-sm font-medium">
           ⚠️ {error}
         </div>
       )}
@@ -400,40 +410,38 @@ export default function YourMailsPage() {
       {/* Share Modal */}
       {showShare && <SharePanel onClose={() => setShowShare(false)} />}
 
-      <main className="min-h-screen section py-10">
-        <div className="max-w-[92rem] mx-auto">
+      <main className="min-h-screen section px-0 sm:px-6 lg:px-8 py-5 sm:py-10">
+        <div className="max-w-[92rem] mx-auto px-0 sm:px-4 lg:px-6">
 
           {/* ── Page Header ── */}
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
-            <div>
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4 sm:mb-6 px-0 sm:px-0">
+            <div className="min-w-0">
               <span className="section-badge">
                 {isOwner ? "My Inbox" : "Shared Inbox"}
               </span>
-              <h1 className="section-title text-2xl sm:text-3xl mt-1">Your Mails</h1>
-              <p className="text-sm text-[#1b4965]/60 font-medium mt-1">
+              <h1 className="section-title text-xl sm:text-3xl mt-1">Your Mails</h1>
+              <p className="text-xs sm:text-sm text-[#1b4965]/60 font-medium mt-1 truncate">
                 {isOwner
-                  ? `Signed in as ${user.email} · ${emails.length} emails, ${unreadCount} unread`
-                  : `Read-only view · ${emails.length} emails, ${unreadCount} unread`
+                  ? `${user.email} · ${emails.length} emails, ${unreadCount} unread`
+                  : `Read-only · ${emails.length} emails, ${unreadCount} unread`
                 }
               </p>
             </div>
 
             {/* Right side actions */}
-            <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
-              {/* Read-only badge — always visible */}
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#1b4965]/8 border border-[#1b4965]/15">
-                <EyeOff size={13} strokeWidth={2} className="text-[#1b4965]" />
-                <span className="text-xs font-bold text-[#1b4965]/70 uppercase tracking-wider">View Only</span>
+            <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto flex-shrink-0">
+              <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#1b4965]/8 border border-[#1b4965]/15">
+                <EyeOff size={12} strokeWidth={2} className="text-[#1b4965]" />
+                <span className="text-[10px] sm:text-xs font-bold text-[#1b4965]/70 uppercase tracking-wider">View Only</span>
               </div>
-
-              {/* Share button — only for logged-in owner */}
               {isOwner && (
                 <button
                   onClick={() => setShowShare(true)}
-                  className="btn btn-primary text-xs px-4 py-2"
+                  className="btn btn-primary text-xs px-3 sm:px-4 py-2"
                 >
-                  <Share2 size={14} strokeWidth={2.5} />
-                  Share Inbox
+                  <Share2 size={13} strokeWidth={2.5} />
+                  <span className="hidden xs:inline">Share Inbox</span>
+                  <span className="xs:hidden">Share</span>
                 </button>
               )}
             </div>
@@ -441,28 +449,39 @@ export default function YourMailsPage() {
 
           {/* ── Public viewer notice ── */}
           {!isOwner && (
-            <div className="mb-5 flex items-center gap-3 px-5 py-3.5 rounded-2xl bg-[#bee9e8]/80 border border-[#62b6cb]/50 shadow-sm">
-              <Globe size={16} strokeWidth={2} className="text-[#1b4965] flex-shrink-0" />
+            <div className="mb-4 sm:mb-5 mx-0 sm:mx-0 flex items-start sm:items-center gap-3 px-4 py-3 rounded-none sm:rounded-2xl bg-[#bee9e8]/80 border border-[#62b6cb]/50 shadow-sm">
+              <Globe size={15} strokeWidth={2} className="text-[#1b4965] flex-shrink-0 mt-0.5 sm:mt-0" />
               <div>
-                <p className="text-sm font-bold text-[#1b4965]">You're viewing a shared inbox</p>
-                <p className="text-xs text-[#1b4965]/60 font-medium">
-                  This inbox was shared with you via a public read-only link. You can view but not reply, delete or modify any emails.
+                <p className="text-xs sm:text-sm font-bold text-[#1b4965]">You're viewing a shared inbox</p>
+                <p className="text-[10px] sm:text-xs text-[#1b4965]/60 font-medium">
+                  Read-only link — you cannot reply, delete or modify emails.
                 </p>
               </div>
             </div>
           )}
 
           {/* ── Main Panel ── */}
-          <div className="glass-card shadow-xl shadow-[#1b4965]/10 overflow-hidden flex flex-col lg:flex-row min-h-[520px] lg:min-h-[620px] lg:h-[calc(100vh-220px)] lg:max-h-[820px]">
+          {/*
+            Mobile:  full-height panels that switch (list ↔ detail), no dual-column
+            Desktop: side-by-side, fixed height
+          */}
+          <div className="glass-card shadow-xl shadow-[#1b4965]/10 overflow-hidden flex flex-col lg:flex-row
+            h-[calc(100svh-220px)] sm:h-[calc(100svh-200px)] lg:min-h-[620px] lg:h-[calc(100vh-220px)] lg:max-h-[820px]
+            rounded-none sm:rounded-2xl">
 
             {/* ════════════════════════════════════
                 LEFT — Email List
+                Mobile:  full-width, hidden when detail open
+                Desktop: fixed sidebar
             ════════════════════════════════════ */}
-            <div className={`flex flex-col border-r border-[#1b4965]/10 flex-shrink-0 min-h-0
-              ${selected ? "hidden lg:flex lg:w-80 xl:w-96" : "flex w-full max-h-[62vh] lg:max-h-none lg:w-80 xl:w-96"}`}>
+            <div className={`flex flex-col border-r border-[#1b4965]/10 min-h-0
+              ${selected
+                ? "hidden lg:flex lg:w-80 xl:w-96"   /* hide on mobile when email open */
+                : "flex w-full lg:w-80 xl:w-96"       /* full width on mobile */
+              }`}>
 
               {/* List Toolbar */}
-              <div className="px-4 py-3 border-b border-[#1b4965]/10 bg-white/20 flex flex-col gap-2.5">
+              <div className="px-3 sm:px-4 py-3 border-b border-[#1b4965]/10 bg-white/20 flex flex-col gap-2 flex-shrink-0">
                 {/* Search */}
                 <div className="relative">
                   <Search size={13} strokeWidth={2} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#1b4965]/40 pointer-events-none" />
@@ -495,7 +514,7 @@ export default function YourMailsPage() {
                     className="flex items-center gap-1.5 text-xs font-semibold text-[#1b4965]/50 hover:text-[#1b4965] transition-colors cursor-pointer border-none bg-transparent p-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <RefreshCw size={12} strokeWidth={2.5} className={isRefreshing ? "animate-spin" : ""} />
-                    {isRefreshing ? "Syncing..." : "Refresh"}
+                    {isRefreshing ? "Syncing…" : "Refresh"}
                   </button>
                 </div>
               </div>
@@ -515,7 +534,7 @@ export default function YourMailsPage() {
                         setSelected(email);
                         markAsRead(email.id);
                       }}
-                      className={`w-full text-left px-4 py-3.5 border-b border-[#1b4965]/8 transition-all duration-150 cursor-pointer
+                      className={`w-full text-left px-3 sm:px-4 py-3 sm:py-3.5 border-b border-[#1b4965]/8 transition-all duration-150 cursor-pointer
                         ${selected?.id === email.id
                           ? "bg-[#1b4965]/10 border-l-2 border-l-[#1b4965]"
                           : email.unread
@@ -524,7 +543,7 @@ export default function YourMailsPage() {
                         }`}
                     >
                       <div className="flex items-start gap-3">
-                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5
+                        <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5
                           ${email.unread ? "bg-[#1b4965] text-[#5fa8d3]" : "bg-[#1b4965]/12 text-[#1b4965]/60"}`}>
                           {email.avatar}
                         </div>
@@ -556,86 +575,76 @@ export default function YourMailsPage() {
 
             {/* ════════════════════════════════════
                 RIGHT — Email Detail
+                Mobile:  full-width, only shown when selected
+                Desktop: flex-1 always visible
             ════════════════════════════════════ */}
-            <div className={`flex-1 flex flex-col min-h-0 ${selected ? "flex max-h-[72vh] lg:max-h-none" : "hidden lg:flex"}`}>
+            <div className={`flex-1 flex flex-col min-h-0
+              ${selected ? "flex w-full" : "hidden lg:flex"}`}>
               {selected ? (
                 <>
                   {/* Detail Header */}
-                  <div className="px-6 py-4 border-b border-[#1b4965]/10 bg-white/20 flex items-start gap-4">
+                  <div className="px-2 sm:px-6 py-3 sm:py-4 border-b border-[#1b4965]/10 bg-white/20 flex items-start gap-3 flex-shrink-0">
+                    {/* Back button — mobile only */}
                     <button
                       onClick={() => setSelected(null)}
                       className="lg:hidden flex-shrink-0 w-8 h-8 rounded-lg bg-[#1b4965]/10 hover:bg-[#1b4965]/20 flex items-center justify-center text-[#1b4965] transition-colors cursor-pointer border-none mt-0.5"
                     >
                       <ChevronLeft size={16} strokeWidth={2.5} />
                     </button>
+
                     <div className="flex-1 min-w-0">
-                      <h2 className="text-base font-extrabold text-[#1b4965] leading-snug mb-2">
+                      {/* Subject */}
+                      <h2 className="text-sm sm:text-base font-extrabold text-[#1b4965] leading-snug mb-2 break-words">
                         {selected.subject}
                       </h2>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-full bg-[#1b4965] flex items-center justify-center text-xs font-bold text-[#5fa8d3]">
-                            {selected.avatar}
-                          </div>
-                          <div>
-                            <span className="text-xs font-bold text-[#1b4965]">{selected.from}</span>
-                            <span className="text-[10px] text-[#1b4965]/50 ml-1.5 font-medium">&lt;{selected.email}&gt;</span>
-                          </div>
+
+                      {/* Sender + time */}
+                      <div className="flex items-center gap-2 mb-2 min-w-0">
+                        <div className="w-7 h-7 rounded-full bg-[#1b4965] flex items-center justify-center text-xs font-bold text-[#5fa8d3] flex-shrink-0">
+                          {selected.avatar}
                         </div>
-                        <div className="flex items-center gap-1.5 text-[10px] text-[#1b4965]/50 font-medium">
-                          <Clock size={11} strokeWidth={2} />
-                          {selected.date}, {selected.time}
+                        <div className="min-w-0 flex-1">
+                          <span className="text-xs font-bold text-[#1b4965] block truncate">{selected.from}</span>
+                          <span className="text-[10px] text-[#1b4965]/50 font-medium block truncate">{selected.email}</span>
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          {selected.starred && (
-                            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 border border-amber-200 text-[10px] font-semibold text-amber-600">
-                              <Star size={9} className="fill-amber-400 text-amber-400" /> Starred
-                            </span>
-                          )}
-                          {selected.hasAttachment && (
-                            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#1b4965]/8 border border-[#1b4965]/15 text-[10px] font-semibold text-[#1b4965]/60">
-                              <Paperclip size={9} /> Attachment
-                            </span>
-                          )}
-                          {selected.unread && (
-                            <span className="px-2 py-0.5 rounded-full bg-[#1b4965]/10 border border-[#1b4965]/20 text-[10px] font-bold text-[#1b4965]">
-                              Unread
-                            </span>
-                          )}
+                        <div className="flex items-center gap-1 text-[10px] text-[#1b4965]/50 font-medium flex-shrink-0">
+                          <Clock size={10} strokeWidth={2} />
+                          <span className="hidden sm:inline">{selected.date}, </span>
+                          {selected.time}
                         </div>
+                      </div>
+
+                      {/* Badges */}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {selected.starred && (
+                          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 border border-amber-200 text-[10px] font-semibold text-amber-600">
+                            <Star size={9} className="fill-amber-400 text-amber-400" /> Starred
+                          </span>
+                        )}
+                        {selected.hasAttachment && (
+                          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#1b4965]/8 border border-[#1b4965]/15 text-[10px] font-semibold text-[#1b4965]/60">
+                            <Paperclip size={9} /> Attachment
+                          </span>
+                        )}
+                        {selected.unread && (
+                          <span className="px-2 py-0.5 rounded-full bg-[#1b4965]/10 border border-[#1b4965]/20 text-[10px] font-bold text-[#1b4965]">
+                            Unread
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
 
                   {/* Email Body */}
-                  <div className="flex-1 min-h-0 px-6 py-5 overflow-y-auto">
+                  <div className="flex-1 min-h-0 px-0 sm:px-6 py-0 sm:py-5 overflow-y-auto overflow-x-hidden">
                     <div className="w-full max-w-full min-w-0">
                       {selected.bodyHtml ? (
                         <div
-                          className="email-html-content w-full max-w-full overflow-hidden text-sm text-[#1b4965]/80 font-medium leading-relaxed bg-white/40 rounded-2xl p-5 border border-[#1b4965]/8"
-                          dangerouslySetInnerHTML={{
-                            __html: DOMPurify.sanitize(selected.bodyHtml, {
-                              ADD_TAGS: ["style"],
-                              ADD_ATTR: [
-                                "style",
-                                "class",
-                                "id",
-                                "width",
-                                "height",
-                                "align",
-                                "bgcolor",
-                                "cellpadding",
-                                "cellspacing",
-                                "border",
-                                "target",
-                                "rel",
-                              ],
-                              FORBID_TAGS: ["script", "iframe", "object", "embed", "form", "input", "button"],
-                            }),
-                          }}
+                          className="email-html-content w-full max-w-full overflow-x-hidden text-xs sm:text-sm text-[#1b4965]/80 font-medium leading-relaxed bg-white/40 sm:rounded-2xl p-2 sm:p-5 border-0 sm:border border-[#1b4965]/8"
+                          dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(selected.bodyHtml) }}
                         />
                       ) : (
-                        <div className="w-full max-w-full min-w-0 break-words text-sm text-[#1b4965]/80 font-medium leading-relaxed bg-white/40 rounded-2xl p-5 border border-[#1b4965]/8">
+                        <div className="w-full max-w-full min-w-0 break-words text-xs sm:text-sm text-[#1b4965]/80 font-medium leading-relaxed bg-white/40 sm:rounded-2xl p-2 sm:p-5 border-0 sm:border border-[#1b4965]/8">
                           {formatBody(selected.body)}
                         </div>
                       )}
@@ -643,7 +652,7 @@ export default function YourMailsPage() {
                   </div>
                 </>
               ) : (
-                /* Empty state */
+                /* Empty state — desktop only */
                 <div className="flex-1 flex flex-col items-center justify-center gap-4 text-[#1b4965]/35 px-8 text-center">
                   <div className="w-20 h-20 rounded-3xl bg-[#1b4965]/8 border border-[#1b4965]/12 flex items-center justify-center">
                     <Mail size={34} strokeWidth={1.5} className="text-[#1b4965]/30" />
@@ -654,7 +663,6 @@ export default function YourMailsPage() {
                       Click any email from the list to view its contents here.
                     </p>
                   </div>
-                  {/* Share CTA in empty state for owner */}
                   {isOwner && (
                     <button
                       onClick={() => setShowShare(true)}
@@ -671,7 +679,7 @@ export default function YourMailsPage() {
           </div>
 
           {/* ── Footer note ── */}
-          <p className="text-center text-xs text-[#1b4965]/45 font-medium mt-4">
+          <p className="text-center text-[10px] sm:text-xs text-[#1b4965]/45 font-medium mt-3 sm:mt-4 px-0 sm:px-0">
             Showing {filtered.length} of {emails.length} emails · Powered by{" "}
             <span className="font-bold text-[#1b4965]/60">MailMirror</span>
           </p>
