@@ -132,6 +132,10 @@ const extractMessageBody = async (payload = {}, accessToken, messageId) => {
 const getMailMessages = async (req, res) => {
   try {
     const userId = req.user.id;
+    const requestedLimit = Number.parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.min(Math.max(requestedLimit, 1), 100)
+      : 100;
     console.log("📧 [Mail Controller] Fetching mails for user:", userId);
 
     // Add retry logic for database connection
@@ -198,7 +202,7 @@ const getMailMessages = async (req, res) => {
     }
 
     console.log("📡 [Mail Controller] Fetching messages from Gmail API...");
-    const messages = await getGmailMessages(accessToken, 20);
+    const messages = await getGmailMessages(accessToken, limit);
     console.log(`✅ [Mail Controller] Got ${messages.length} messages`);
 
     // Fetch full message details for each

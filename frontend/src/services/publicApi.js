@@ -3,9 +3,9 @@ import api from "./api";
 /**
  * Get user's Gmail messages
  */
-export const getMailMessages = () => {
-  console.log("📧 [Mail API] Fetching messages...");
-  return api.get("/mail/messages");
+export const getMailMessages = (limit = 100) => {
+  console.log("📧 [Mail API] Fetching messages...", { limit });
+  return api.get("/mail/messages", { params: { limit } });
 };
 
 /**

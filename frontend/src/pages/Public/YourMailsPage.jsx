@@ -350,7 +350,7 @@ export default function YourMailsPage() {
         setLoading(true);
       }
       setError(null);
-      const response = await getMailMessages();
+      const response = await getMailMessages(100);
       if (response.data?.emails) {
         const readIds = getReadIds();
         const formattedEmails = response.data.emails.map((email) => ({
