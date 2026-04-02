@@ -1,10 +1,7 @@
 import { useState, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { Mail, Menu, X, LayoutDashboard, LogOut, LogIn } from "lucide-react";
-
-// Replace with your real AuthContext import
-// import { useAuth } from "../../context/AuthContext";
-const useAuth = () => ({ user: null, logout: () => {} });
+import { useAuth } from "../../context/AuthContext";
 
 const NAV_LINKS = [
   { label: "Home",       to: "/" },

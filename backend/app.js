@@ -2,6 +2,9 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 
+// Routes
+const authRoutes = require("./routes/authRoutes");
+const mailRoutes = require("./routes/mailRoutes");
 
 const app = express();
 
@@ -38,7 +41,13 @@ app.use(
 app.use(express.json());
 
 // --- Routes ---
+console.log("📌 [App] Mounting /auth routes...");
+app.use("/auth", authRoutes);
+console.log("✅ [App] /auth routes mounted");
 
+console.log("📌 [App] Mounting /mail routes...");
+app.use("/mail", mailRoutes);
+console.log("✅ [App] /mail routes mounted");
 
 app.get("/", (req, res) => {
   res.send("API is Running!");

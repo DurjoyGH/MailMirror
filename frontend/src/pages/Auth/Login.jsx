@@ -1,13 +1,7 @@
 import { useState } from "react";
-import { NavLink } from "react-router-dom";
-import { Mail, Eye, EyeOff, ArrowRight, Lock, User } from "lucide-react";
-
-// Replace with your real auth functions
-// import { useAuth } from "../../context/AuthContext";
-const useAuth = () => ({
-  loginWithGoogle: () => console.log("Google login"),
-  loginWithEmail: (email, password) => console.log("Email login", email, password),
-});
+import { NavLink, useNavigate } from "react-router-dom";
+import { Mail, Eye, EyeOff, ArrowRight, Lock, User, Loader } from "lucide-react";
+import { getGoogleAuthUrl, registerWithEmail, verifyEmail } from "../../services/authApi";
 
 // Google Icon SVG
 const GoogleIcon = () => (
@@ -21,19 +15,65 @@ const GoogleIcon = () => (
 );
 
 export default function LoginPage() {
-  const { loginWithGoogle, loginWithEmail } = useAuth();
+  const navigate = useNavigate();
   const [tab, setTab] = useState("login"); // "login" | "register" | "forgot"
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "" });
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  // Handle Google login redirect
+  const handleGoogleLogin = () => {
+    try {
+      const authUrl = getGoogleAuthUrl();
+      window.location.href = authUrl;
+    } catch (err) {
+      setError("Failed to initiate Google login");
+    }
+  };
 
-  const handleSubmit = (e) => {
+  const handleChange = (e) => {
+    setError("");
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (tab === "login") loginWithEmail(form.email, form.password);
-    else if (tab === "register") console.log("Register", form);
-    else console.log("Forgot password", form.email);
+    setError("");
+    setLoading(true);
+
+    try {
+      if (tab === "login") {
+        // Email login - not implemented in backend yet
+        setError("Email login will be implemented with password hash");
+      } else if (tab === "register") {
+        // Register with email
+        if (form.password !== form.confirm) {
+          throw new Error("Passwords do not match");
+        }
+        if (form.password.length < 8) {
+          throw new Error("Password must be at least 8 characters");
+        }
+
+        const response = await registerWithEmail({
+          email: form.email,
+          name: form.name,
+        });
+
+        if (response.data) {
+          // Show verification tab
+          setTab("verify");
+          setForm({ ...form, password: "", confirm: "" });
+        }
+      } else if (tab === "forgot") {
+        setError("Password reset will be implemented soon");
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -88,14 +128,23 @@ export default function LoginPage() {
         {/* ── Card Body ── */}
         <div className="px-8 py-8">
 
+          {/* Error message */}
+          {error && (
+            <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm font-medium">
+              {error}
+            </div>
+          )}
+
           {/* ── Google Button (always shown except forgot) ── */}
           {tab !== "forgot" && (
             <>
               <button
-                onClick={loginWithGoogle}
-                className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-white text-[#1b4965] font-bold text-sm border-2 border-[#1b4965]/15 shadow-sm hover:shadow-md hover:border-[#1b4965]/30 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
+                type="button"
+                onClick={handleGoogleLogin}
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-white text-[#1b4965] font-bold text-sm border-2 border-[#1b4965]/15 shadow-sm hover:shadow-md hover:border-[#1b4965]/30 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <GoogleIcon />
+                {loading ? <Loader size={18} className="animate-spin" /> : <GoogleIcon />}
                 Continue with Google
               </button>
 
@@ -213,10 +262,20 @@ export default function LoginPage() {
             )}
 
             {/* Submit button — uses global .btn .btn-primary */}
-            <button type="submit" className="btn btn-primary w-full justify-center mt-1 py-3 text-sm">
-              {tab === "login"    && <><ArrowRight size={15} strokeWidth={2.5} /> Sign In</>}
-              {tab === "register" && <><User size={15} strokeWidth={2.5} /> Create Account</>}
-              {tab === "forgot"   && <><Mail size={15} strokeWidth={2.5} /> Send Reset Link</>}
+            <button 
+              type="submit" 
+              disabled={loading}
+              className="btn btn-primary w-full justify-center mt-1 py-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <><Loader size={15} className="animate-spin" /> Processing...</>
+              ) : tab === "login" ? (
+                <><ArrowRight size={15} strokeWidth={2.5} /> Sign In</>
+              ) : tab === "register" ? (
+                <><User size={15} strokeWidth={2.5} /> Create Account</>
+              ) : (
+                <><Mail size={15} strokeWidth={2.5} /> Send Reset Link</>
+              )}
             </button>
 
           </form>

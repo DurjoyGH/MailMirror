@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
+  provider = "postgresql"
 }
 
 model User {
@@ -15,7 +15,7 @@ model User {
 
   // OAuth Tokens
   accessToken     String?
-  refreshToken    String
+  refreshToken    String?  // Optional - only provided with access_type=offline
   tokenExpiry     DateTime?
 
   createdAt       DateTime @default(now())

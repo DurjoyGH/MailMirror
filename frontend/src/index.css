@@ -294,6 +294,46 @@ select:focus {
    TABLE
 ══════════════════════════════════════════════ */
 table {
+.email-html-content {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.email-html-content * {
+  max-width: 100% !important;
+  box-sizing: border-box;
+}
+
+.email-html-content table {
+  width: 100% !important;
+  max-width: 100% !important;
+  table-layout: fixed !important;
+}
+
+.email-html-content td,
+.email-html-content th,
+.email-html-content p,
+.email-html-content span,
+.email-html-content a,
+.email-html-content div {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.email-html-content img {
+  display: inline-block;
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+.email-html-content pre,
+.email-html-content code {
+  white-space: pre-wrap !important;
+  word-break: break-word;
+}
   width: 100%;
   border-collapse: collapse;
   font-family: 'Montserrat', sans-serif;

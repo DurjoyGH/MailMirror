@@ -1,15 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import DOMPurify from "dompurify";
 import {
   Mail, Search, RefreshCw, Eye, EyeOff, Clock,
   Paperclip, Star, ChevronLeft, Inbox, Filter,
   Share2, Link2, Copy, Check, ToggleLeft, ToggleRight,
   Trash2, Plus, ShieldCheck, Globe, Lock,
 } from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
+import { getMailMessages, createShareLink, getShareLinks } from "../../services/publicApi";
+import Loader from "../../components/Loader/Loader";
 
-// ── Mock Auth (replace with real useAuth) ─────────────────────────────────────
-const useAuth = () => ({ user: { name: "Md. Arif", email: "arif@example.com" } });
-
-// ── Demo Data ─────────────────────────────────────────────────────────────────
+// ── Demo Data (fallback) ──────────────────────────────────────────────────────
 const DEMO_EMAILS = [
   {
     id: 1,
@@ -266,13 +267,110 @@ function SharePanel({ onClose }) {
 // ── Main Page Component ───────────────────────────────────────────────────────
 export default function YourMailsPage() {
   const { user } = useAuth();
-  const [emails] = useState(DEMO_EMAILS);
+  const [emails, setEmails] = useState(DEMO_EMAILS);
+  const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState(null);
   const [selected, setSelected] = useState(null);
   const [search, setSearch] = useState("");
   const [filterUnread, setFilterUnread] = useState(false);
   const [showShare, setShowShare] = useState(false);
 
   const isOwner = !!user; // true = logged-in owner, false = public viewer
+
+  const getReadStorageKey = () => {
+    const identity = user?.id || user?.email || "guest";
+    return `mailmirror_read_${identity}`;
+  };
+
+  const getReadIds = () => {
+    try {
+      const raw = localStorage.getItem(getReadStorageKey());
+      const parsed = raw ? JSON.parse(raw) : [];
+      return new Set(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      return new Set();
+    }
+  };
+
+  const saveReadIds = (idsSet) => {
+    localStorage.setItem(getReadStorageKey(), JSON.stringify([...idsSet]));
+  };
+
+  const markAsRead = (messageId) => {
+    if (!isOwner) return;
+
+    const ids = getReadIds();
+    ids.add(messageId);
+    saveReadIds(ids);
+
+    setEmails((prev) =>
+      prev.map((mail) => (mail.id === messageId ? { ...mail, unread: false } : mail))
+    );
+
+    setSelected((prev) =>
+      prev && prev.id === messageId ? { ...prev, unread: false } : prev
+    );
+  };
+
+  const fetchMails = async ({ refresh = false } = {}) => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      console.log("📧 [YourMailsPage] Fetching mails...");
+      if (refresh) {
+        setIsRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      setError(null);
+
+      const response = await getMailMessages();
+      console.log("✅ [YourMailsPage] Mails fetched:", response.data.count);
+
+      if (response.data?.emails) {
+        const readIds = getReadIds();
+
+        const formattedEmails = response.data.emails.map((email) => ({
+          id: email.id,
+          from: email.from.split("<")[0].trim() || "Unknown",
+          email: email.from,
+          subject: email.subject || "(No Subject)",
+          preview: email.preview || "",
+          body: email.body || email.preview || "",
+          bodyHtml: email.bodyHtml || "",
+          time: new Date(email.date).toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          date: new Date(email.date).toLocaleDateString(),
+          // Unread/read is managed by MailMirror app state, not Gmail label.
+          unread: !readIds.has(email.id),
+          starred: email.starred,
+          hasAttachment: email.hasAttachment,
+          avatar: email.from.charAt(0).toUpperCase(),
+        }));
+
+        setEmails(formattedEmails);
+      }
+    } catch (err) {
+      console.error("❌ [YourMailsPage] Error fetching mails:", err.message);
+      setError("Failed to load mails. Using demo data.");
+      setEmails(DEMO_EMAILS);
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  // Fetch mails on component mount
+  useEffect(() => {
+    fetchMails();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const filtered = emails.filter((e) => {
     const q = search.toLowerCase();
@@ -286,13 +384,24 @@ export default function YourMailsPage() {
 
   const unreadCount = emails.filter((e) => e.unread).length;
 
+  if (loading && isOwner) {
+    return <Loader />;
+  }
+
   return (
     <>
+      {/* Error message */}
+      {error && (
+        <div className="mx-4 mt-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm font-medium">
+          ⚠️ {error}
+        </div>
+      )}
+
       {/* Share Modal */}
       {showShare && <SharePanel onClose={() => setShowShare(false)} />}
 
       <main className="min-h-screen section py-10">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-[92rem] mx-auto">
 
           {/* ── Page Header ── */}
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
@@ -344,13 +453,13 @@ export default function YourMailsPage() {
           )}
 
           {/* ── Main Panel ── */}
-          <div className="glass-card shadow-xl shadow-[#1b4965]/10 overflow-hidden flex flex-col lg:flex-row min-h-[620px]">
+          <div className="glass-card shadow-xl shadow-[#1b4965]/10 overflow-hidden flex flex-col lg:flex-row min-h-[520px] lg:min-h-[620px] lg:h-[calc(100vh-220px)] lg:max-h-[820px]">
 
             {/* ════════════════════════════════════
                 LEFT — Email List
             ════════════════════════════════════ */}
-            <div className={`flex flex-col border-r border-[#1b4965]/10 flex-shrink-0
-              ${selected ? "hidden lg:flex lg:w-80 xl:w-96" : "flex w-full lg:w-80 xl:w-96"}`}>
+            <div className={`flex flex-col border-r border-[#1b4965]/10 flex-shrink-0 min-h-0
+              ${selected ? "hidden lg:flex lg:w-80 xl:w-96" : "flex w-full max-h-[62vh] lg:max-h-none lg:w-80 xl:w-96"}`}>
 
               {/* List Toolbar */}
               <div className="px-4 py-3 border-b border-[#1b4965]/10 bg-white/20 flex flex-col gap-2.5">
@@ -380,15 +489,19 @@ export default function YourMailsPage() {
                     Unread {filterUnread && `(${unreadCount})`}
                   </button>
 
-                  <button className="flex items-center gap-1.5 text-xs font-semibold text-[#1b4965]/50 hover:text-[#1b4965] transition-colors cursor-pointer border-none bg-transparent p-0">
-                    <RefreshCw size={12} strokeWidth={2.5} />
-                    Refresh
+                  <button
+                    onClick={() => fetchMails({ refresh: true })}
+                    disabled={isRefreshing}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-[#1b4965]/50 hover:text-[#1b4965] transition-colors cursor-pointer border-none bg-transparent p-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <RefreshCw size={12} strokeWidth={2.5} className={isRefreshing ? "animate-spin" : ""} />
+                    {isRefreshing ? "Syncing..." : "Refresh"}
                   </button>
                 </div>
               </div>
 
               {/* Email rows */}
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 min-h-0 overflow-y-auto">
                 {filtered.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full py-16 gap-3 text-[#1b4965]/40">
                     <Inbox size={36} strokeWidth={1.5} />
@@ -398,7 +511,10 @@ export default function YourMailsPage() {
                   filtered.map((email) => (
                     <button
                       key={email.id}
-                      onClick={() => setSelected(email)}
+                      onClick={() => {
+                        setSelected(email);
+                        markAsRead(email.id);
+                      }}
                       className={`w-full text-left px-4 py-3.5 border-b border-[#1b4965]/8 transition-all duration-150 cursor-pointer
                         ${selected?.id === email.id
                           ? "bg-[#1b4965]/10 border-l-2 border-l-[#1b4965]"
@@ -441,7 +557,7 @@ export default function YourMailsPage() {
             {/* ════════════════════════════════════
                 RIGHT — Email Detail
             ════════════════════════════════════ */}
-            <div className={`flex-1 flex flex-col ${selected ? "flex" : "hidden lg:flex"}`}>
+            <div className={`flex-1 flex flex-col min-h-0 ${selected ? "flex max-h-[72vh] lg:max-h-none" : "hidden lg:flex"}`}>
               {selected ? (
                 <>
                   {/* Detail Header */}
@@ -491,20 +607,38 @@ export default function YourMailsPage() {
                     </div>
                   </div>
 
-                  {/* Read-only notice */}
-                  <div className="mx-6 mt-4 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#bee9e8]/80 border border-[#62b6cb]/40">
-                    <EyeOff size={13} strokeWidth={2} className="text-[#1b4965] flex-shrink-0" />
-                    <p className="text-xs font-semibold text-[#1b4965]/70">
-                      Read-only view — reply, forward and delete are disabled.
-                    </p>
-                  </div>
-
                   {/* Email Body */}
-                  <div className="flex-1 px-6 py-5 overflow-y-auto">
-                    <div className="max-w-2xl">
-                      <div className="text-sm text-[#1b4965]/80 font-medium leading-relaxed bg-white/40 rounded-2xl p-5 border border-[#1b4965]/8">
-                        {formatBody(selected.body)}
-                      </div>
+                  <div className="flex-1 min-h-0 px-6 py-5 overflow-y-auto">
+                    <div className="w-full max-w-full min-w-0">
+                      {selected.bodyHtml ? (
+                        <div
+                          className="email-html-content w-full max-w-full overflow-hidden text-sm text-[#1b4965]/80 font-medium leading-relaxed bg-white/40 rounded-2xl p-5 border border-[#1b4965]/8"
+                          dangerouslySetInnerHTML={{
+                            __html: DOMPurify.sanitize(selected.bodyHtml, {
+                              ADD_TAGS: ["style"],
+                              ADD_ATTR: [
+                                "style",
+                                "class",
+                                "id",
+                                "width",
+                                "height",
+                                "align",
+                                "bgcolor",
+                                "cellpadding",
+                                "cellspacing",
+                                "border",
+                                "target",
+                                "rel",
+                              ],
+                              FORBID_TAGS: ["script", "iframe", "object", "embed", "form", "input", "button"],
+                            }),
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full max-w-full min-w-0 break-words text-sm text-[#1b4965]/80 font-medium leading-relaxed bg-white/40 rounded-2xl p-5 border border-[#1b4965]/8">
+                          {formatBody(selected.body)}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </>
