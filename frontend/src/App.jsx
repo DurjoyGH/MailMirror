@@ -8,6 +8,8 @@ import GuestRoute from "./components/ProtectedRoutes/GuestRoute";
 import ScrollToTop from "./components/ScrollTop/ScrollTop";
 import HomePage from "./pages/Public/HomePage";
 import Login from "./pages/Auth/Login";
+import YourMailsPage from "./pages/Public/YourMailsPage.jsx";
+import ContactPage from "./pages/Public/ContactPage.jsx";
 
 function App() {
   return (
@@ -22,6 +24,8 @@ function App() {
           {/* Public routes — anyone can access */}
           <Route element={<PublicLayout />}>
             <Route path="/" element={<HomePage />} />
+            <Route path="/your-mails" element={<YourMailsPage />} />
+              <Route path="/contact" element={<ContactPage />} />
 
             {/* Guest only — redirect away if already logged in */}
             <Route element={<GuestRoute />}>

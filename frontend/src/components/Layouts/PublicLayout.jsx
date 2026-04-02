@@ -1,17 +1,15 @@
+import { Outlet } from "react-router-dom";
 import Navbar from "../Navigations/Navbar";
 import Footer from "../Navigations/Footer";
-import ScrollTop from "../ScrollTop/ScrollTop";
-import { Outlet } from "react-router-dom";
 
 export default function PublicLayout() {
   return (
-    <div className="flex flex-col min-h-screen bg-[#bee9e8] font-montserrat">
+    <div className="min-h-screen flex flex-col bg-[#bee9e8]">
       <Navbar />
       <main className="flex-1">
         <Outlet />
       </main>
       <Footer />
-      <ScrollTop />
     </div>
   );
 }
